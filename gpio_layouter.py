@@ -4,7 +4,6 @@
 # sheets.
 #
 # author: Heikki Kilpeläinen
-# email:  heikki@kilpe.fi
 # license: MIT
 # 2021
 
