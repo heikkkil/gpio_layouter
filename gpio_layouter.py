@@ -56,15 +56,12 @@ class BG(Enum):
 
 # Color
 class Color():
-    def __init__(self, fg:FG = FG.no_color, bg:BG = BG.no_color, \
-            escape_seq = None):
+    def __init__(self, fg:FG = FG.no_color, bg:BG = BG.no_color):
         self.fg = fg
         self.bg = bg
-        self.escape = escape_seq if escape_seq is not None else \
-                '\\033[{0};{1}m{2}\\033[0m'
 
     def set(self, s:str) -> str:
-        return self.escape.format(self.bg, self.fg, s)
+        return f'\033[{self.bg.value};{self.fg.value}m{s}\033[0m'
 
 
 # Symbol
@@ -76,21 +73,13 @@ class Symbol():
     def __str__(self):
         return self.color.set(self.char)
 
-
-# Legend
-class Legend():
-    def __init__(self, symbol:Symbol, name:str, description:str = ''):
-        self.symbol = symbol
-        self.name = name
-        self.desc = f'({description})' if description is not '' else ''
-
-    def __str__(self):
-        return f'{self.symbol} {self.name} {self.desc}'
+    def set_char(self, char:str) -> None:
+        self.char = char
 
 
-#
+# String field widths
 class StrWidth():
-    def __init__(self, w_symbol = 2, w_pin = 3, w_pull = 3, w_name = 8, \
+    def __init__(self, w_symbol = 1, w_pin = 4, w_pull = 4, w_name = 8, \
             w_desc = 13):
         self.s:int = w_symbol
         self.p:int = w_pin
@@ -99,11 +88,33 @@ class StrWidth():
         self.d:int = w_desc
 
 
+# Legend
+class Legend():
+    def __init__(self, symbol:Symbol, name:str, description:str = '', \
+            widths:StrWidth = None):
+        self.symbol = str(symbol)
+        self.name = name
+        self.desc = f'({description})' if description is not '' else ''
+        self.w = StrWidth() if widths is None else widths
+
+    def __str__(self):
+        return (
+                f'{self.symbol : <{self.w.s}} '
+                f'{self.name : <{self.w.n}} '
+                f'{self.desc : <{self.w.d}}')
+
+
 # Format GPIO
 class FGPIO():
     def __init__(self, symbol:Symbol, pin:str or int, pull:str, name:str, \
             description:str = '', right:bool = True, widths:StrWidth = None):
-        self.symbol = symbol
+        self.raw_symbol = symbol
+        if str(pin) == "1":
+            self.raw_symbol.set_char('■')
+        # FIXME This next step is super mysterious, it thinks pin 17 is pin 1
+        if str(pin) == "17":
+            self.raw_symbol.set_char('©') # Hard coded!
+        self.symbol = str(self.raw_symbol)
         self.pin = str(pin)
         self.pull = pull
         self.name = name
@@ -112,47 +123,45 @@ class FGPIO():
         self.w = StrWidth() if widths is None else widths
         # Headers
         self.h = {
-                "symbol":"",
+                "symbol":" ", # Note the whitespace
                 "pin":"pin",
                 "pull":"pull",
                 "name":"name",
                 "desc":""}
 
-        # Force convert ground pin to corresponding symbol
-        if self.pin == 1:
-            self.symbol.char = '■'
-
     def __str__(self):
         # RIGHT: symbol, pin, pull, name, (description)
         # fields justified to left
         if self.right:
-            return f'{str(self.symbol).ljust(self.w.s)} \
-                    {self.pin.ljust(self.w.p)} \
-                    {self.pull.ljust(self.w.pu)} \
-                    {self.name.ljust(self.w.n)} \
-                    {self.desc.ljust(self.w.d)}'
+            return (
+                    f'{self.symbol : <{self.w.s}} '
+                    f'{self.pin : <{self.w.p}} '
+                    f'{self.pull : <{self.w.pu}} '
+                    f'{self.name : <{self.w.n}} '
+                    f'{self.desc : <{self.w.d}}')
         # LEFT:  (description), name, pull, pin, symbol
         # fields justified to right
         else:
-            return f'{self.desc.rjust(self.w.d)} \
-                    {self.name.rjust(self.w.n)} \
-                    {self.pull.rjust(self.w.pu)} \
-                    {self.pin.rjust(self.w.p)} \
-                    {str(self.symbol).rjust(self.w.s)}'
+            return (
+                    f'{self.desc : >{self.w.d}} '
+                    f'{self.name : <{self.w.n}} '   # Sic!
+                    f'{self.pull : >{self.w.pu}} '
+                    f'{self.pin : >{self.w.p}} '
+                    f'{self.symbol : >{self.w.s}}')
 
-    def header(self):
-        if self.right:
-            return f'{str(self.h["symbol"]).ljust(self.w.s)} \
-                    {self.h["pin"].ljust(self.w.p)} \
-                    {self.h["pull"].ljust(self.w.pu)} \
-                    {self.h["name"].ljust(self.w.n)} \
-                    {self.h["desc"].ljust(self.w.d)}'
-        else:
-            return f'{self.h["desc"].ljust(self.w.d)} \
-                    {self.h["name"].ljust(self.w.n)} \
-                    {self.h["pull"].ljust(self.w.pu)} \
-                    {self.h["pin"].ljust(self.w.p)} \
-                    {str(self.h["symbol"]).ljust(self.w.s)}'
+    def get_header(self) -> str:
+        return (
+                f'{self.h["desc"] : >{self.w.d}} '
+                f'{self.h["name"] : <{self.w.n}} '
+                f'{self.h["pull"] : >{self.w.pu}} '
+                f'{self.h["pin"] : >{self.w.p}} '
+                f'{self.h["symbol"] : ^{self.w.s}}'
+#                f'{self.h["symbol"] : ^{self.w.s}}'
+#                f'{self.h["pin"] : >{self.w.p}} '
+#                f'{self.h["pull"] : <{self.w.pu}} '
+#                f'{self.h["name"] : <{self.w.n}} '
+#                f'{self.h["desc"] : <{self.w.d}}')
+               )
 
 
 # Format Map
@@ -165,12 +174,18 @@ class Map():
         if legends is None:
             print('No legend available')
         else:
+            print("Legend:")
             for line in legends:
                 print(line)
 
     def print_map(self) -> None:
-        for line in fgpios:
+        line = ""
+        i = 0
+        n = len(fgpios)
+        while i < n:
+            line = str(fgpios[i]) + str(fgpios[i + 1])
             print(line)
+            i += 2
 
 
 # Unit test - Raspberry Pi GPIO layout
@@ -265,4 +280,8 @@ if __name__ == '__main__':
 
     # Print the layout
     m.print_legend()
+    print()
+    # Print header of a left aligned element
+    print(fgpios[1].get_header())
+    print()
     m.print_map()
